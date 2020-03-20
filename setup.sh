@@ -91,6 +91,7 @@ function setup_autolock ()
 {
 	sudo cp $CUR_DIR/pkcs11_eventmgr.conf /etc/pam_pkcs11/pkcs11_eventmgr.conf
 	sudo cp $CUR_DIR/smartcard-screensaver.desktop /etc/xdg/autostart/smartcard-screensaver.desktop
+	sudo systemctl daemon-reload
 }
 
 
