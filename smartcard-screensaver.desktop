@@ -1,0 +1,5 @@
+[Desktop Entry]
+Type=Application
+Name=Smart Card Screensaver
+Comment=Application to lock screen on smart card removal.
+Exec=/usr/bin/pkcs11_eventmgr daemon

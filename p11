@@ -1,0 +1,5 @@
+Name: Pam_p11
+Default: yes
+Priority: 800
+Auth-Type: Primary
+Auth: sufficient pam_p11_opensc.so /usr/lib/librtpkcs11ecp.so
