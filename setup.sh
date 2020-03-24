@@ -15,7 +15,7 @@ function install_packages ()
 	wget -q "https://download.rutoken.ru/Rutoken/PKCS11Lib/Current/Linux/x64/librtpkcs11ecp_2.0.4.0-1_amd64.deb";
 	if [[ $? -ne 0 ]]; then echoerr "Не могу скачать пакет librtpkcs11ecp.so"; fi 
 	sudo dpkg -i librtpkcs11ecp_2.0.4.0-1_amd64.deb > /dev/null;
-	if [[ $? -ne 0 ]]; then echoerr "Не установить пакет librtpkcs11ecp.so"; fi 
+	if [[ $? -ne 0 ]]; then echoerr "Не могу установить пакет librtpkcs11ecp.so"; fi 
 
 	sudo apt-get -qq update
 	sudo apt-get -qq install libengine-pkcs11-openssl1.1 opensc libccid pcscd libpam-p11 libpam-pkcs11 libp11-2 dialog;
@@ -24,7 +24,7 @@ function install_packages ()
 
 function token_present ()
 {
-	cert_ids=`pkcs11-tool --module /usr/lib/librtpkcs11ecp.so -O 2> /dev/null`;
+	pkcs11-tool --module /usr/lib/librtpkcs11ecp.so -O > /dev/null 2> /dev/null;
 	return $?
 }
 function choose_cert ()
@@ -35,7 +35,7 @@ function choose_cert ()
 		return
 	fi
 
-	cert_ids=`echo -e "$cert_ids\n\"Новый сертификатa\""`;
+	cert_ids=`echo -e "$cert_ids\n\"Новый сертификат\""`;
 	cert_ids=`echo "$cert_ids" | awk '{printf("%s\t%s\n", NR, $0)}'`;
 	cert_id=`echo $cert_ids | xargs dialog --keep-tite --stdout --title "Выбор сертификат" --menu "Выберете сертификат" 0 0 0`;
 	cert_id=`echo "$cert_ids" | sed "${cert_id}q;d" | cut -f2 -d$'\t'`;
@@ -49,16 +49,31 @@ function create_cert ()
 	pkcs11-tool --module /usr/lib/librtpkcs11ecp.so --keypairgen --key-type rsa:2048 -l -p $PIN --id $cert_id > /dev/null 2> /dev/null;
 	if [[ $? -ne 0 ]]; then echoerr "Не удалось создать ключевую пару"; fi 
 	
-	C=`dialog --keep-tite --stdout --title "Данные сертификата" --inputbox "Country Name (2 letter code):" 0 0 "RU"`;
+	C="RU";
 	ST=`dialog --keep-tite --stdout --title "Данные сертификата" --inputbox "Регион:" 0 0 "Москва"`;
 	L=`dialog --keep-tite --stdout --title "Данные сертификата" --inputbox "Населенный пункт:" 0 0 ""`;
 	O=`dialog --keep-tite --stdout --title "Данные сертификата" --inputbox "Организация:" 0 0 "ООО Ромашка"`;
 	OU=`dialog --keep-tite --stdout --title "Данные сертификата" --inputbox "Подразделение:" 0 0 ""`;
 	CN=`dialog --keep-tite --stdout --title "Данные сертификата" --inputbox "Общее имя:" 0 0 ""`;
 	email=`dialog --keep-tite --stdout --title "Данные сертификата" --inputbox "Электронная почта:" 0 0 ""`;
-	printf "engine dynamic -pre SO_PATH:/usr/lib/x86_64-linux-gnu/engines-1.1/pkcs11.so -pre ID:pkcs11 -pre LIST_ADD:1  -pre LOAD -pre MODULE_PATH:/usr/lib/librtpkcs11ecp.so \n req -engine pkcs11 -new -key 0:$cert_id -keyform engine -x509 -out cert.crt -outform DER -subj \"/C=$C/ST=$ST/L=$L/O=$O/OU=$OU/CN=$CN/emailAddress=$email\"" | openssl > /dev/null;
-	if [[ $? -ne 0 ]]; then echoerr "Не удалось создать сертификат открытого ключа"; fi 
+	
+	choice=`dialog --keep-tite --stdout --title "Выбор корневого сертификата" --menu "Родительский сертификат:" 0 0 0 1 "Создать самоподписанный сертификат" 2 "Создать заявку на сертификат"`	
+	
+	if [[ choice -eq 1  ]]
+	then
+		printf "engine dynamic -pre SO_PATH:/usr/lib/x86_64-linux-gnu/engines-1.1/pkcs11.so -pre ID:pkcs11 -pre LIST_ADD:1  -pre LOAD -pre MODULE_PATH:/usr/lib/librtpkcs11ecp.so \n req -engine pkcs11 -new -key 0:$cert_id -keyform engine -x509 -out cert.crt -outform DER -subj \"/C=$C/ST=$ST/L=$L/O=$O/OU=$OU/CN=$CN/emailAddress=$email\"" | openssl > /dev/null;
+		
+		if [[ $? -ne 0 ]]; then echoerr "Не удалось создать сертификат открытого ключа"; fi 
+	else
+		printf "engine dynamic -pre SO_PATH:/usr/lib/x86_64-linux-gnu/engines-1.1/pkcs11.so -pre ID:pkcs11 -pre LIST_ADD:1  -pre LOAD -pre MODULE_PATH:/usr/lib/librtpkcs11ecp.so \n req -engine pkcs11 -new -key 0:$cert_id -keyform engine -out $CUR_DIR/cert.req -subj \"/C=$C/ST=$ST/L=$L/O=$O/OU=$OU/CN=$CN/emailAddress=$email\"" | openssl > /dev/null;
+		
+		if [[ $? -ne 0 ]]; then echoerr "Не удалось создать заявку на сертификат открытого ключа"; fi 
+		
+		echo "Отправьте заявку на получение сертификата УЦ. После получение сертификата, запишите его на токен с помощью export_cert_on_token.sh. И повторите запуск setup.sh"
+		exit
+	fi
 
+	
 	pkcs11-tool --module /usr/lib/librtpkcs11ecp.so -l -p $PIN -y cert -w cert.crt --id $cert_id > /dev/null 2> /dev/null;
 	if [[ $? -ne 0 ]]; then echoerr "Не удалось загрзить сертификат на токен"; fi 
 	echo $cert_id
@@ -109,6 +124,12 @@ then
 	echo "Создание новой ключевой пары и сертификата"
 	PIN=`get_token_password`
 	cert_id=`create_cert`
+fi
+
+if ! [[ "$cert_id" =~ $NUMBER_REGEXP ]]
+then
+	echo "$cert_id"
+	exit
 fi
 
 echo "Настройка аутентификации с помощью Рутокена"
