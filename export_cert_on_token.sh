@@ -4,8 +4,9 @@ echoerr() { echo "Ошибка: $@" 1>&2; exit; }
 
 function token_present ()
 {
-	pkcs11-tool --module /usr/lib/librtpkcs11ecp.so -O > /dev/null 2> /dev/null;
-	return $?
+        cnt=`lsusb | grep "Aktiv Rutoken" | wc -l`
+        if [[ cnt -eq 0 ]]; then echoerr "Устройство семейства Рутокен ЭЦП не найдено"; exit; fi
+        if [[ cnt -ne 1 ]]; then echoerr "Найдено несколько устройств семейства Рутокен ЭЦП. Оставьте только одно"; exit; fi
 }
 
 function choose_key ()
@@ -42,6 +43,7 @@ if [[ $? -ne 0 ]]; then echoerr "Устройство семейства Рут�
 echo "Выбор ключа, для которого был сделан сертификат"
 key_id=`choose_key`
 
+if [[ -z key_id ]]; then exit; fi
 echo "Экспорт сертификата на Рутокен"
 PIN=`get_token_password`
 export_cert $key_id
