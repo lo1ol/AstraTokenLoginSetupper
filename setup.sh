@@ -24,9 +24,11 @@ function install_packages ()
 
 function token_present ()
 {
-	pkcs11-tool --module /usr/lib/librtpkcs11ecp.so -O > /dev/null 2> /dev/null;
-	return $?
+	cnt=`lsusb | grep "Aktiv Rutoken" | wc -l`
+	if [[ cnt -eq 0 ]]; then echoerr "Устройство семейства Рутокен ЭЦП не найдено"; exit; fi
+	if [[ cnt -ne 1 ]]; then echoerr "Найдено несколько устройств семейства Рутокен ЭЦП. Оставьте только одно"; exit; fi
 }
+
 function choose_cert ()
 {
 	cert_ids=`pkcs11-tool --module /usr/lib/librtpkcs11ecp.so -O --type cert 2> /dev/null | grep -Eo "ID:.*" |  awk '{print $2}'`;
@@ -114,7 +116,6 @@ install_packages
 
 echo "Обнаружение подключенного устройства семейства Рутокен ЭЦП"
 token_present
-if [[ $? -ne 0 ]]; then echoerr "Устройство семейства Рутокен ЭЦП не найдено"; exit; fi
 
 echo "Выбор сертификата для входа в систему"
 cert_id=`choose_cert`
