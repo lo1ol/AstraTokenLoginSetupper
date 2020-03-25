@@ -6,7 +6,7 @@ CUR_DIR=`pwd`
 function init() { cd $(mktemp -d); }
 function cleanup() { rm -rf `pwd`; cd $CUR_DIR; }
 
-echoerr() { echo "Ошибка: $@" 1>&2; cleanup; exit; }
+echoerr() { echo -e "Ошибка: $@" 1>&2; cleanup; exit; }
 
 function install_packages ()
 {
@@ -50,7 +50,7 @@ function gen_cert_id ()
 	while [[ -n "$res" ]]
 	do
 		cert_ids=`get_cert_list`
-		rand=`echo $(( 11 + $RANDOM % 2))`
+		rand=`echo $(( $RANDOM % 10000 ))`
 		res=`echo $cert_ids | grep -w $rand`
 	done
 	
@@ -60,7 +60,7 @@ function gen_cert_id ()
 function create_key_and_cert ()
 {
 	cert_id=`gen_cert_id`
-	out=`pkcs11-tool --module /usr/lib/librtpkcs11ecp.so --keypairgen --key-type rsa:2048 -l -p $PIN --id $cert_id`;
+	out=`pkcs11-tool --module /usr/lib/librtpkcs11ecp.so --keypairgen --key-type rsa:2048 -l -p $PIN --id $cert_id 2>&1`;
 	if [[ $? -ne 0 ]]; then echoerr "Не удалось создать ключевую пару: $out"; fi 
 	
 	C="RU";
@@ -85,7 +85,7 @@ function create_key_and_cert ()
 		
 		if [[ $? -ne 0 ]]; then echoerr "Не удалось создать заявку на сертификат открытого ключа"; fi 
 		
-		echo "Отправьте заявку на получение сертификата УЦ. После получение сертификата, запишите его на токен с помощью export_cert_on_token.sh. И повторите запуск setup.sh"
+		echo "Отправьте заявку на получение сертификата УЦ. После получение сертификата, запишите его на токен с помощью export_cert_on_token.sh под индентификатором $cert_id. И повторите запуск setup.sh"
 		exit
 	fi
 
@@ -146,6 +146,8 @@ then
 	echo "$cert_id"
 	exit
 fi
+
+echo "Выбранный сертификат имеет идентифкатор $cert_id"
 
 echo "Настройка аутентификации с помощью Рутокена"
 setup_authentication $cert_id
