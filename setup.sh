@@ -1,6 +1,6 @@
 #!/bin/bash
 
-NUMBER_REGEXP='^[0-9]+$'
+NUMBER_REGEXP='^[0123456789abcdefABCDEF]+$'
 CUR_DIR=`pwd`
 
 function init() { cd $(mktemp -d); }
@@ -10,16 +10,9 @@ echoerr() { echo "Ошибка: $@" 1>&2; cleanup; exit; }
 
 function install_packages ()
 {
-	if [[ $? -ne 0 ]]; then echoerr "Не могу установить пакет libengine-pkcs11-openssl"; fi 
-
-	wget -q "https://download.rutoken.ru/Rutoken/PKCS11Lib/Current/Linux/x64/librtpkcs11ecp_2.0.4.0-1_amd64.deb";
-	if [[ $? -ne 0 ]]; then echoerr "Не могу скачать пакет librtpkcs11ecp.so"; fi 
-	sudo dpkg -i librtpkcs11ecp_2.0.4.0-1_amd64.deb > /dev/null;
-	if [[ $? -ne 0 ]]; then echoerr "Не могу установить пакет librtpkcs11ecp.so"; fi 
-
 	sudo apt-get -qq update
-	sudo apt-get -qq install libengine-pkcs11-openssl1.1 opensc libccid pcscd libpam-p11 libpam-pkcs11 libp11-2 dialog;
-	if [[ $? -ne 0 ]]; then echoerr "Не могу установить один из пакетов: libengine-pkcs11-openssl1.1 opensc libccid pcscd libpam-p11 libpam-pkcs11 libp11-2 dialog из репозитория"; fi
+	sudo apt-get -qq install librtpkcs11ecp libengine-pkcs11-openssl1.1 opensc libccid pcscd libpam-p11 libpam-pkcs11 libp11-2 dialog;
+	if [[ $? -ne 0 ]]; then echoerr "Не могу установить один из пакетов: librtpkcs11ecp libengine-pkcs11-openssl1.1 opensc libccid pcscd libpam-p11 libpam-pkcs11 libp11-2 dialog из репозитория"; fi
 }
 
 function token_present ()
@@ -29,27 +22,46 @@ function token_present ()
 	if [[ cnt -ne 1 ]]; then echoerr "Найдено несколько устройств семейства Рутокен ЭЦП. Оставьте только одно"; exit; fi
 }
 
-function choose_cert ()
+function get_cert_list ()
 {
 	cert_ids=`pkcs11-tool --module /usr/lib/librtpkcs11ecp.so -O --type cert 2> /dev/null | grep -Eo "ID:.*" |  awk '{print $2}'`;
+	echo "$cert_ids";
+}
+
+function choose_cert ()
+{
+	cert_ids=`get_cert_list`
 	if [[ -z "$cert_ids" ]]
 	then
-		return
+		echo "None"
+		exit
 	fi
 
 	cert_ids=`echo -e "$cert_ids\n\"Новый сертификат\""`;
 	cert_ids=`echo "$cert_ids" | awk '{printf("%s\t%s\n", NR, $0)}'`;
-	cert_id=`echo $cert_ids | xargs dialog --keep-tite --stdout --title "Выбор сертификат" --menu "Выберете сертификат" 0 0 0`;
+	cert_id=`echo $cert_ids | xargs dialog --keep-tite --stdout --title "Выбор сертификата" --menu "Выберете сертификат" 0 0 0`;
 	cert_id=`echo "$cert_ids" | sed "${cert_id}q;d" | cut -f2 -d$'\t'`;
 	echo "$cert_id"
 }
 
-function create_cert ()
+function gen_cert_id ()
 {
-	cert_id=`dialog --keep-tite --stdout --title "Задание идентификатора сертификата" --inputbox "Придумайте идентификатор сертификата(должен быть числом): " 0 0 ""`;
-	if ! [[ "$cert_id" =~ $NUMBER_REGEXP ]]; then echoerr "id сертификата должно быть числом"; fi	
-	pkcs11-tool --module /usr/lib/librtpkcs11ecp.so --keypairgen --key-type rsa:2048 -l -p $PIN --id $cert_id > /dev/null 2> /dev/null;
-	if [[ $? -ne 0 ]]; then echoerr "Не удалось создать ключевую пару"; fi 
+	res="1"
+	while [[ -n "$res" ]]
+	do
+		cert_ids=`get_cert_list`
+		rand=`echo $(( 11 + $RANDOM % 2))`
+		res=`echo $cert_ids | grep -w $rand`
+	done
+	
+	echo "$rand"
+}
+
+function create_key_and_cert ()
+{
+	cert_id=`gen_cert_id`
+	out=`pkcs11-tool --module /usr/lib/librtpkcs11ecp.so --keypairgen --key-type rsa:2048 -l -p $PIN --id $cert_id`;
+	if [[ $? -ne 0 ]]; then echoerr "Не удалось создать ключевую пару: $out"; fi 
 	
 	C="RU";
 	ST=`dialog --keep-tite --stdout --title "Данные сертификата" --inputbox "Регион:" 0 0 "Москва"`;
@@ -61,13 +73,15 @@ function create_cert ()
 	
 	choice=`dialog --keep-tite --stdout --title "Выбор корневого сертификата" --menu "Родительский сертификат:" 0 0 0 1 "Создать самоподписанный сертификат" 2 "Создать заявку на сертификат"`	
 	
+	openssl_req="engine dynamic -pre SO_PATH:/usr/lib/x86_64-linux-gnu/engines-1.1/pkcs11.so -pre ID:pkcs11 -pre LIST_ADD:1  -pre LOAD -pre MODULE_PATH:/usr/lib/librtpkcs11ecp.so \n req -engine pkcs11 -new -key 0:$cert_id -keyform engine -out cert.crt -outform DER -subj \"/C=$C/ST=$ST/L=$L/O=$O/OU=$OU/CN=$CN/emailAddress=$email\""
+
 	if [[ choice -eq 1  ]]
 	then
-		printf "engine dynamic -pre SO_PATH:/usr/lib/x86_64-linux-gnu/engines-1.1/pkcs11.so -pre ID:pkcs11 -pre LIST_ADD:1  -pre LOAD -pre MODULE_PATH:/usr/lib/librtpkcs11ecp.so \n req -engine pkcs11 -new -key 0:$cert_id -keyform engine -x509 -out cert.crt -outform DER -subj \"/C=$C/ST=$ST/L=$L/O=$O/OU=$OU/CN=$CN/emailAddress=$email\"" | openssl > /dev/null;
+		printf "$openssl_req -x509"| openssl > /dev/null;
 		
 		if [[ $? -ne 0 ]]; then echoerr "Не удалось создать сертификат открытого ключа"; fi 
 	else
-		printf "engine dynamic -pre SO_PATH:/usr/lib/x86_64-linux-gnu/engines-1.1/pkcs11.so -pre ID:pkcs11 -pre LIST_ADD:1  -pre LOAD -pre MODULE_PATH:/usr/lib/librtpkcs11ecp.so \n req -engine pkcs11 -new -key 0:$cert_id -keyform engine -out $CUR_DIR/cert.req -subj \"/C=$C/ST=$ST/L=$L/O=$O/OU=$OU/CN=$CN/emailAddress=$email\"" | openssl > /dev/null;
+		printf "$openssl_req" | openssl > /dev/null;
 		
 		if [[ $? -ne 0 ]]; then echoerr "Не удалось создать заявку на сертификат открытого ключа"; fi 
 		
@@ -91,7 +105,7 @@ function setup_authentication ()
 	cat cert.pem >> ~/.eid/authorized_certificates;
 	chmod 0644 ~/.eid/authorized_certificates;
 	sudo cp $CUR_DIR/p11 /usr/share/pam-configs/p11;
-	read -p "ВАЖНО: Нажмите Enter и в следующем окне выбери Pam_p11"
+	read -p "ВАЖНО: Нажмите Enter и в следующем окне выберите Pam_p11"
 	sudo pam-auth-update;
 }
 
@@ -124,7 +138,7 @@ if ! [[ "$cert_id" =~ $NUMBER_REGEXP ]]
 then
 	echo "Создание новой ключевой пары и сертификата"
 	PIN=`get_token_password`
-	cert_id=`create_cert`
+	cert_id=`create_key_and_cert`
 fi
 
 if ! [[ "$cert_id" =~ $NUMBER_REGEXP ]]
