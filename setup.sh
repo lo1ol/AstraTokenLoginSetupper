@@ -10,8 +10,14 @@ echoerr() { echo -e "Ошибка: $@" 1>&2; cleanup; exit; }
 
 function install_packages ()
 {
+	wget -q "https://download.rutoken.ru/Rutoken/PKCS11Lib/Current/Linux/x64/librtpkcs11ecp_2.0.4.0-1_amd64.deb";
+        if [[ $? -ne 0 ]]; then echoerr "Не могу скачать пакет librtpkcs11ecp.so"; fi 
+        
+	sudo dpkg -i librtpkcs11ecp_2.0.4.0-1_amd64.deb > /dev/null;
+        if [[ $? -ne 0 ]]; then echoerr "Не могу установить пакет librtpkcs11ecp.so"; fi 
+
 	sudo apt-get -qq update
-	sudo apt-get -qq install librtpkcs11ecp libengine-pkcs11-openssl1.1 opensc libccid pcscd libpam-p11 libpam-pkcs11 libp11-2 dialog;
+	sudo apt-get -qq install libengine-pkcs11-openssl1.1 opensc libccid pcscd libpam-p11 libpam-pkcs11 libp11-2 dialog;
 	if [[ $? -ne 0 ]]; then echoerr "Не могу установить один из пакетов: librtpkcs11ecp libengine-pkcs11-openssl1.1 opensc libccid pcscd libpam-p11 libpam-pkcs11 libp11-2 dialog из репозитория"; fi
 }
 
@@ -129,7 +135,8 @@ echo "Установка пакетов"
 install_packages
 
 echo "Обнаружение подключенного устройства семейства Рутокен ЭЦП"
-token_present
+# TODO в Astra Linux Смленск название токена не отображается, поэтому на время закомментирует проверку
+#token_present
 
 echo "Выбор сертификата для входа в систему"
 cert_id=`choose_cert`
