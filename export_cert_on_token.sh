@@ -4,7 +4,7 @@ echoerr() { echo "Ошибка: $@" 1>&2; exit; }
 
 function token_present ()
 {
-        cnt=`lsusb | grep "Aktiv Rutoken" | wc -l`
+        cnt=`lsusb | grep "0a89:0030" | wc -l`
         if [[ cnt -eq 0 ]]; then echoerr "Устройство семейства Рутокен ЭЦП не найдено"; exit; fi
         if [[ cnt -ne 1 ]]; then echoerr "Найдено несколько устройств семейства Рутокен ЭЦП. Оставьте только одно"; exit; fi
 }
@@ -37,8 +37,7 @@ function get_token_password ()
 }
 
 echo "Обнаружение подключенного устройства семейства Рутокен ЭЦП"
-# TODO в Astra Linux Смленск название токена не отображается, поэтому на время закомментирует проверку
-#token_present
+token_present
 if [[ $? -ne 0 ]]; then echoerr "Устройство семейства Рутокен ЭЦП не найдено"; exit; fi
 
 echo "Выбор ключа, для которого был сделан сертификат"
