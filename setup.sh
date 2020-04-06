@@ -15,7 +15,7 @@ function install_packages ()
 	sudo apt-get -qq install librtpkcs11ecp;
 	if [[ $? -ne 0 ]]
 	then
-		wget -q "https://download.rutoken.ru/Rutoken/PKCS11Lib/Current/Linux/x64/librtpkcs11ecp.so";
+		wget -q --no-check-certificate "https://download.rutoken.ru/Rutoken/PKCS11Lib/Current/Linux/x64/librtpkcs11ecp.so";
         	if [[ $? -ne 0 ]]; then echoerr "Не могу скачать пакет librtpkcs11ecp.so"; fi 
 		sudo cp librtpkcs11ecp.so /usr/lib/;
 	fi
