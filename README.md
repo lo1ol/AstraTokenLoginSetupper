@@ -16,5 +16,5 @@ bash setup.sh
 ```bash
 openssl x509 -req -in cert.req -CA root.crt -CAkey root.key -CAcreateserial -out cert.crt -days 365 -outform DER
 ```
-3. Запустите export_cert_to_token.sh и укажите ключ, для которого был создан сертификат и путь до сертификата.
+3. Запустите import_cert_to_token.sh и укажите ключ, для которого был создан сертификат и путь до сертификата.
 4. Повторно запустите setup.sh и выберите id созданного сертификата.
