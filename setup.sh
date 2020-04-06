@@ -82,7 +82,7 @@ function create_key_and_cert ()
 	
 	choice=`dialog --keep-tite --stdout --title "Выбор корневого сертификата" --menu "Родительский сертификат:" 0 0 0 1 "Создать самоподписанный сертификат" 2 "Создать заявку на сертификат"`	
 	
-	openssl_req="engine dynamic -pre SO_PATH:/usr/lib/x86_64-linux-gnu/engines-1.1/pkcs11.so -pre ID:pkcs11 -pre LIST_ADD:1  -pre LOAD -pre MODULE_PATH:/usr/lib/librtpkcs11ecp.so \n req -engine pkcs11 -new -key 0:$cert_id -keyform engine -out cert.crt -outform DER -subj \"/C=$C/ST=$ST/L=$L/O=$O/OU=$OU/CN=$CN/emailAddress=$email\""
+	openssl_req="engine dynamic -pre SO_PATH:/usr/lib/x86_64-linux-gnu/engines-1.1/pkcs11.so -pre ID:pkcs11 -pre LIST_ADD:1  -pre LOAD -pre MODULE_PATH:/usr/lib/librtpkcs11ecp.so \n req -engine pkcs11 -new -key \"0:$cert_id\" -keyform engine -out $CUR_DIR/cert.crt -outform DER -subj \"/C=$C/ST=$ST/L=$L/O=$O/OU=$OU/CN=$CN/emailAddress=$email\""
 
 	if [[ choice -eq 1  ]]
 	then
