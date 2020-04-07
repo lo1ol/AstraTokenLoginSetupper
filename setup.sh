@@ -48,7 +48,7 @@ function choose_cert ()
 
 	cert_ids=`echo -e "$cert_ids\n\"Новый сертификат\""`;
 	cert_ids=`echo "$cert_ids" | awk '{printf("%s\t%s\n", NR, $0)}'`;
-	cert_id=`echo $cert_ids | xargs dialog --keep-tite --stdout --title "Выбор сертификата" --menu "Выберете сертификат" 0 0 0`;
+	cert_id=`echo $cert_ids | xargs dialog --keep-tite --stdout --title "Выбор сертификата" --menu "Выбeрите сертификат" 0 0 0`;
 	cert_id=`echo "$cert_ids" | sed "${cert_id}q;d" | cut -f2 -d$'\t'`;
 	echo "$cert_id"
 }
@@ -80,7 +80,7 @@ function create_key_and_cert ()
 	CN=`dialog --keep-tite --stdout --title "Данные сертификата" --inputbox "Общее имя:" 0 0 ""`;
 	email=`dialog --keep-tite --stdout --title "Данные сертификата" --inputbox "Электронная почта:" 0 0 ""`;
 	
-	choice=`dialog --keep-tite --stdout --title "Выбор корневого сертификата" --menu "Родительский сертификат:" 0 0 0 1 "Создать самоподписанный сертификат" 2 "Создать заявку на сертификат"`	
+	choice=`dialog --keep-tite --stdout --title "Создание сертификата" --menu "Укажите опцию" 0 0 0 1 "Создать самоподписанный сертификат" 2 "Создать заявку на сертификат"`
 	
 	openssl_req="engine dynamic -pre SO_PATH:/usr/lib/x86_64-linux-gnu/engines-1.1/pkcs11.so -pre ID:pkcs11 -pre LIST_ADD:1  -pre LOAD -pre MODULE_PATH:/usr/lib/librtpkcs11ecp.so \n req -engine pkcs11 -new -key \"0:$cert_id\" -keyform engine -subj \"/C=$C/ST=$ST/L=$L/O=$O/OU=$OU/CN=$CN/emailAddress=$email\""
 
@@ -94,7 +94,7 @@ function create_key_and_cert ()
 		
 		if [[ $? -ne 0 ]]; then echoerr "Не удалось создать заявку на сертификат открытого ключа"; fi 
 		
-		echo "Отправьте заявку на получение сертификата УЦ. После получение сертификата, запишите его на токен с помощью import_cert_on_token.sh под индентификатором $cert_id. И повторите запуск setup.sh"
+		echo "Отправьте заявку на сертификат в УЦ для выпуска сертификата. После получение сертификата, запишите его на токен с помощью import_cert_to_token.sh под индентификатором $cert_id. И повторите запуск setup.sh"
 		exit
 	fi
 

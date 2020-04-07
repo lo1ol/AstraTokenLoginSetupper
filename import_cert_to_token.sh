@@ -18,7 +18,7 @@ function choose_key ()
 	fi
 
 	key_ids=`echo "$key_ids" | awk '{printf("%s\t%s\n", NR, $0)}'`;
-	key_id=`echo $key_ids | xargs dialog --keep-tite --stdout --title "Выбор ключа" --menu "Выберете ключ" 0 0 0`;
+	key_id=`echo $key_ids | xargs dialog --keep-tite --stdout --title "Выбор ключа" --menu "Выберите ключ" 0 0 0`;
 	key_id=`echo "$key_ids" | sed "${key_id}q;d" | cut -f2 -d$'\t'`;
 	echo "$key_id"
 }
